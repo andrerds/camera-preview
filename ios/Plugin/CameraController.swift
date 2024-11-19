@@ -258,16 +258,33 @@ extension CameraController {
         captureSession.commitConfiguration()
     }
 
-    func captureImage(completion: @escaping (UIImage?, Error?) -> Void) {
-        guard let captureSession = captureSession, captureSession.isRunning else { completion(nil, CameraControllerError.captureSessionIsMissing); return }
-        let settings = AVCapturePhotoSettings()
+     func captureImage(completion: @escaping (UIImage?, Error?) -> Void) {
+      guard let captureSession = captureSession, captureSession.isRunning else {
+          completion(nil, CameraControllerError.captureSessionIsMissing)
+          return
+      }
 
-        settings.flashMode = self.flashMode
-        settings.isHighResolutionPhotoEnabled = self.highResolutionOutput
+      let settings = AVCapturePhotoSettings()
+      settings.flashMode = self.flashMode
+      settings.isHighResolutionPhotoEnabled = self.highResolutionOutput
 
-        self.photoOutput?.capturePhoto(with: settings, delegate: self)
-        self.photoCaptureCompletionBlock = completion
-    }
+      self.photoOutput?.capturePhoto(with: settings, delegate: self)
+
+      self.photoCaptureCompletionBlock = { [weak self] (capturedImage, error) in
+          guard let strongSelf = self, let image = capturedImage else {
+              completion(nil, error)
+              return
+          }
+
+          // Assume uma área de recorte centrada e quadrada, ajustar conforme necessário
+          let size = min(image.size.width, image.size.height)
+          let cropRect = CGRect(x: (image.size.width - size) / 2, y: (image.size.height - size) / 2, width: size, height: size)
+          let croppedCgImage = image.cgImage?.cropping(to: cropRect)
+          let croppedImage = croppedCgImage.map { UIImage(cgImage: $0) }
+
+          completion(croppedImage, nil)
+      }
+  }
 
     func captureSample(completion: @escaping (UIImage?, Error?) -> Void) {
         guard let captureSession = captureSession,
